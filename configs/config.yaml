@@ -1,0 +1,20 @@
+
+dataset:
+  name: MNIST
+  data_dir: data/MNIST
+
+  # Dataset pools
+  target_pool_size: 6000
+  shadow_pool_size: 30000
+
+  # Target Model
+  target_train_size: 3000
+  target_nonmember_size: 3000
+
+  # Shadow Models
+  num_shadow_models: 5
+  shadow_train_size: 3000
+  shadow_nonmember_size: 3000
+
+  # Reproducibility
+  random_seed: 42

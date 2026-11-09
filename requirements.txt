@@ -7,3 +7,4 @@ pandas
 opacus
 pyyaml
 tqdm
+importlib-metadata
