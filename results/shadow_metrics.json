@@ -1,0 +1,62 @@
+[
+    {
+        "model_id": 1,
+        "train_samples": 3000,
+        "nonmember_samples": 3000,
+        "epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "test_loss": 0.33306999274585397,
+        "test_accuracy": 0.9272,
+        "test_accuracy_percent": 92.72,
+        "device": "mps"
+    },
+    {
+        "model_id": 2,
+        "train_samples": 3000,
+        "nonmember_samples": 3000,
+        "epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "test_loss": 0.31529067323058846,
+        "test_accuracy": 0.9275,
+        "test_accuracy_percent": 92.75,
+        "device": "mps"
+    },
+    {
+        "model_id": 3,
+        "train_samples": 3000,
+        "nonmember_samples": 3000,
+        "epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "test_loss": 0.28132211972791704,
+        "test_accuracy": 0.9336,
+        "test_accuracy_percent": 93.36,
+        "device": "mps"
+    },
+    {
+        "model_id": 4,
+        "train_samples": 3000,
+        "nonmember_samples": 3000,
+        "epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "test_loss": 0.33718640506165104,
+        "test_accuracy": 0.9278,
+        "test_accuracy_percent": 92.78,
+        "device": "mps"
+    },
+    {
+        "model_id": 5,
+        "train_samples": 3000,
+        "nonmember_samples": 3000,
+        "epochs": 20,
+        "batch_size": 64,
+        "learning_rate": 0.001,
+        "test_loss": 0.29400612376369534,
+        "test_accuracy": 0.9303,
+        "test_accuracy_percent": 93.03,
+        "device": "mps"
+    }
+]

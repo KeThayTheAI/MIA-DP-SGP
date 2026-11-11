@@ -18,3 +18,8 @@ dataset:
 
   # Reproducibility
   random_seed: 42
+  
+training:
+  batch_size: 64
+  epochs: 20
+  learning_rate: 0.001

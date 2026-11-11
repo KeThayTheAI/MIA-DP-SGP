@@ -1,0 +1,12 @@
+{
+    "model": "Target Model",
+    "epochs": 20,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "train_samples": 3000,
+    "test_samples": 10000,
+    "test_loss": 0.2995186027690768,
+    "test_accuracy": 0.932,
+    "test_accuracy_percent": 93.2,
+    "device": "mps"
+}
