@@ -18,8 +18,29 @@ dataset:
 
   # Reproducibility
   random_seed: 42
-  
+
 training:
   batch_size: 64
   epochs: 20
   learning_rate: 0.001
+
+attack:
+# Số Shadow Models dùng để train Attack Classifier
+  train_shadow_models: 4
+
+  # Các Shadow Models còn lại dùng để validation
+  # Không cần khai báo riêng, chương trình tự tính
+
+model:
+  architecture: MLP
+  num_classes: 10
+
+dp:
+  enabled: false
+  max_grad_norm: 1.0
+  noise_multiplier: 1.0
+  delta: 0.00001
+
+experiment:
+  id: exp_001
+  output_dir: experiments

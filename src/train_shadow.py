@@ -98,6 +98,26 @@ def main():
     config = load_config()
     data = load_datasets()
 
+    experiment_config = config["experiment"]
+
+    experiment_dir = (
+        PROJECT_ROOT
+        / experiment_config["output_dir"]
+        / experiment_config["id"]
+    )
+
+    expected_models = config["dataset"]["num_shadow_models"]
+    actual_models = len(data["shadow_models"])
+
+    if actual_models != expected_models:
+        raise ValueError(
+            "Expected {} Shadow Models, but received {}.".format(
+                expected_models,
+                actual_models
+            )
+        )
+
+    print("Number of Shadow Models:", actual_models)
     seed = config["dataset"]["random_seed"]
     batch_size = config["training"]["batch_size"]
     epochs = config["training"]["epochs"]
@@ -119,15 +139,15 @@ def main():
     criterion = nn.CrossEntropyLoss()
 
     # Thu muc luu checkpoint va metrics
-    checkpoint_dir = PROJECT_ROOT / "checkpoints"
-    results_dir = PROJECT_ROOT / "results"
+    checkpoint_dir = experiment_dir / "checkpoints"
+    results_dir = experiment_dir / "results"
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     all_metrics = []
 
-    # Huan luyen lan luot 5 Shadow Models
+    # Huan luyen lan luot cac Shadow Models
     for shadow in data["shadow_models"]:
         model_id = shadow["model_id"]
 
@@ -138,6 +158,16 @@ def main():
 
         # Lay du lieu Member cua Shadow Model hien tai
         train_dataset = shadow["train"]
+        nonmember_dataset = shadow["nonmember"]
+        if len(train_dataset) != config["dataset"]["shadow_train_size"]:
+            raise ValueError(
+                "Shadow {} has incorrect training size.".format(model_id)
+            )
+
+        if len(nonmember_dataset) != config["dataset"]["shadow_nonmember_size"]:
+            raise ValueError(
+                "Shadow {} has incorrect non-member size.".format(model_id)
+            )
 
         # Chi dung Member de huan luyen
         train_loader = DataLoader(
@@ -202,9 +232,10 @@ def main():
 
         # Luu thong tin danh gia
         shadow_metrics = {
+            "experiment_id": config["experiment"]["id"],
             "model_id": model_id,
             "train_samples": len(train_dataset),
-            "nonmember_samples": len(shadow["nonmember"]),
+            "nonmember_samples": len(nonmember_dataset),
             "epochs": epochs,
             "batch_size": batch_size,
             "learning_rate": learning_rate,
@@ -220,7 +251,7 @@ def main():
         del model
         del optimizer
 
-    # Luu ket qua cua ca 5 Shadow Models
+    # Luu ket qua cua cac Shadow Models
     metrics_path = results_dir / "shadow_metrics.json"
 
     with open(metrics_path, "w", encoding="utf-8") as file:

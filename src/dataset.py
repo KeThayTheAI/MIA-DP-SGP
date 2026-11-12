@@ -1,6 +1,8 @@
 
 import yaml
 import numpy as np
+import json
+import shutil
 
 from pathlib import Path
 from torchvision import datasets, transforms
@@ -14,8 +16,9 @@ from torch.utils.data import Subset
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 CONFIG_PATH = PROJECT_ROOT / "configs" / "config.yaml"
+# Default paths (will be updated by setup_experiment)
 SPLIT_PATH = PROJECT_ROOT / "results" / "splits.npz"
-
+SPLIT_CONFIG_PATH = PROJECT_ROOT / "results" / "split_config.json"
 
 # ============================================================
 # 2. LOAD CONFIGURATION
@@ -37,6 +40,69 @@ def load_config():
 
     return config
 
+"""Tạo thư mục experiments/exp_001/results.
+    Tạo thư mục experiments/exp_001/checkpoints.
+    Lưu bản sao cấu hình vào exp_001/config.yaml.
+    Chuyển đường dẫn lưu split sang thư mục experiment.
+    Nếu là exp_001, sao chép split baseline cũ sang vị trí mới, không xóa hay sửa file gốc."""
+
+def setup_experiment(config):
+    """Create experiment directories and configure experiment paths."""
+
+    global SPLIT_PATH, SPLIT_CONFIG_PATH
+
+    experiment_config = config.get("experiment")
+
+    if not isinstance(experiment_config, dict):
+        raise ValueError("Missing experiment section in config.yaml.")
+
+    experiment_id = experiment_config.get("id")
+    output_dir = experiment_config.get("output_dir")
+
+    if not experiment_id or Path(experiment_id).name != experiment_id:
+        raise ValueError("Invalid experiment ID.")
+
+    if not output_dir:
+        raise ValueError("Missing experiment output_dir.")
+
+    experiment_dir = PROJECT_ROOT / output_dir / experiment_id
+
+    experiment_results = experiment_dir / "results"
+    experiment_checkpoints = experiment_dir / "checkpoints"
+
+    experiment_results.mkdir(parents=True, exist_ok=True)
+    experiment_checkpoints.mkdir(parents=True, exist_ok=True)
+
+    # Save a copy of the configuration used for this experiment.
+    config_snapshot = experiment_dir / "config.yaml"
+
+    if not config_snapshot.exists():
+        shutil.copy2(CONFIG_PATH, config_snapshot)
+
+    # New experiment-specific split paths.
+    SPLIT_PATH = experiment_results / "splits.npz"
+    SPLIT_CONFIG_PATH = experiment_results / "split_config.json"
+
+    # Preserve the original baseline split when migrating to exp_001.
+    legacy_split = PROJECT_ROOT / "results" / "splits.npz"
+    legacy_split_config = PROJECT_ROOT / "results" / "split_config.json"
+
+    if (
+        experiment_id == "exp_001"
+        and not SPLIT_PATH.exists()
+        and legacy_split.exists()
+    ):
+        shutil.copy2(legacy_split, SPLIT_PATH)
+
+        if legacy_split_config.exists():
+            shutil.copy2(legacy_split_config, SPLIT_CONFIG_PATH)
+
+        print("Existing baseline splits copied to exp_001.")
+
+    print("Current Experiment:", experiment_id)
+    print("Experiment Directory:", experiment_dir)
+
+    return experiment_dir
 
 # ============================================================
 # 3. VALIDATE CONFIGURATION
@@ -383,6 +449,34 @@ def load_saved_splits():
             for key in data.files
         }
 
+#Luu cau hinh hien tại vao JSON
+def save_split_config(settings):
+    """Save the configuration used to create dataset splits."""
+
+    SPLIT_CONFIG_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with open(SPLIT_CONFIG_PATH, "w", encoding="utf-8") as file:
+        json.dump(
+            settings,
+            file,
+            indent=4
+        )
+
+    print("Split configuration saved to:", SPLIT_CONFIG_PATH)
+
+
+def load_saved_split_config():
+    """Load the configuration used by existing dataset splits."""
+
+    if not SPLIT_CONFIG_PATH.exists():
+        return None
+
+    with open(SPLIT_CONFIG_PATH, "r", encoding="utf-8") as file:
+        return json.load(file)
+
 
 # ============================================================
 # 8. CHECK SPLITS
@@ -564,6 +658,7 @@ def load_datasets():
     """Load MNIST and prepare all datasets."""
 
     config = load_config()
+    setup_experiment(config)
     dataset_config = config["dataset"]
 
     data_dir = PROJECT_ROOT / dataset_config["data_dir"]
@@ -580,9 +675,12 @@ def load_datasets():
         len(train_dataset)
     )
 
+    
     # --------------------------------------------------------
     # Load existing splits or create new ones
     # --------------------------------------------------------
+
+    needs_save_config = False
 
     if SPLIT_PATH.exists():
 
@@ -590,7 +688,7 @@ def load_datasets():
 
         splits = load_saved_splits()
 
-        # Ensure existing splits match current configuration.
+        # Check expected keys.
         expected_shadow_keys = []
 
         for model_id in range(1, settings["num_shadow_models"] + 1):
@@ -610,8 +708,31 @@ def load_datasets():
         if set(splits.keys()) != set(required_keys):
             raise ValueError(
                 "Saved splits do not match current configuration. "
-                "Remove results/splits.npz to create new splits."
+                "Back up and regenerate results/splits.npz."
             )
+
+        # Check saved configuration.
+        saved_settings = load_saved_split_config()
+
+        if saved_settings is not None:
+
+            if saved_settings != settings:
+                raise ValueError(
+                    "Dataset configuration has changed. "
+                    "Existing splits cannot be reused. "
+                    "Back up and regenerate splits.npz."
+                )
+
+            print("Saved split configuration matches current config.")
+
+        else:
+            # Legacy split: validate first, then save its configuration.
+            print(
+                "Warning: Existing splits have no configuration metadata. "
+                "They will be adopted if all checks pass."
+            )
+
+            needs_save_config = True
 
     else:
 
@@ -624,6 +745,8 @@ def load_datasets():
 
         save_splits(splits)
 
+        needs_save_config = True
+
     # --------------------------------------------------------
     # Validate splits
     # --------------------------------------------------------
@@ -633,6 +756,11 @@ def load_datasets():
         settings,
         labels
     )
+
+    # Save metadata only after all split checks pass.
+    if needs_save_config:
+        save_split_config(settings)
+
 
     # --------------------------------------------------------
     # Build PyTorch datasets

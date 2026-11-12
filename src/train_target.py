@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Để Python tìm được các module trong project
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.dataset import load_config, load_datasets
+from src.dataset import load_config, load_datasets, setup_experiment
 from models.target_model import MLP
 
 
@@ -98,6 +98,14 @@ def main():
     config = load_config()
     data = load_datasets()
 
+    experiment_config = config["experiment"]
+
+    experiment_dir = (
+        PROJECT_ROOT
+        / experiment_config["output_dir"]
+        / experiment_config["id"]
+    )
+
     seed = config["dataset"]["random_seed"]
     batch_size = config["training"]["batch_size"]
     epochs = config["training"]["epochs"]
@@ -165,9 +173,9 @@ def main():
     print(f"Test Accuracy: {test_accuracy:.4f}")
     print(f"Test Accuracy (%): {test_accuracy * 100:.2f}%")
 
-    # Tạo thư mục lưu kết quả
-    checkpoint_dir = PROJECT_ROOT / "checkpoints"
-    results_dir = PROJECT_ROOT / "results"
+    # Tạo thư mục lưu kết quả của Experiment
+    checkpoint_dir = experiment_dir / "checkpoints"
+    results_dir = experiment_dir / "results"
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -187,6 +195,7 @@ def main():
     # Lưu metrics
     metrics = {
         "model": "Target Model",
+        "experiment_id": config["experiment"]["id"],
         "epochs": epochs,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
