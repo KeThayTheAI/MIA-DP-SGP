@@ -4,3 +4,9 @@ __pycache__/
 data/
 checkpoints/
 results/splits.npz
+**/checkpoints/
+**/results/
+**/splits/
+*.pth
+*.pt
+*.npz

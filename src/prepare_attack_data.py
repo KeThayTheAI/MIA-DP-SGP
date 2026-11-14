@@ -87,9 +87,13 @@ def main():
     batch_size = config["training"]["batch_size"]
     device = get_device()
 
-    checkpoint_dir = experiment_dir / "checkpoints"
-    results_dir = experiment_dir / "results"
+    # Thu muc chua Shadow Models va Attack Dataset cua Attacker
+    attacker_dir = experiment_dir / "attacker"
 
+    checkpoint_dir = attacker_dir / "checkpoints"
+    results_dir = attacker_dir / "results"
+
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Danh sach chua du lieu Attack

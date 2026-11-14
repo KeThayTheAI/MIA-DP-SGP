@@ -138,9 +138,11 @@ def main():
 
     criterion = nn.CrossEntropyLoss()
 
-    # Thu muc luu checkpoint va metrics
-    checkpoint_dir = experiment_dir / "checkpoints"
-    results_dir = experiment_dir / "results"
+    # Thu muc luu checkpoint va metrics cua Attacker
+    attacker_dir = experiment_dir / "attacker"
+
+    checkpoint_dir = attacker_dir / "checkpoints"
+    results_dir = attacker_dir / "results"
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -200,6 +202,17 @@ def main():
                 f"Loss: {train_loss:.4f} "
                 f"Accuracy: {train_accuracy:.4f}"
             )
+        # Danh gia lai tren tap Member sau khi training
+        train_loss, train_accuracy = evaluate(
+            model,
+            train_loader,
+            criterion,
+            device
+        )
+
+        print("\nFinal Training Evaluation:")
+        print(f"Train Loss: {train_loss:.4f}")
+        print(f"Train Accuracy: {train_accuracy * 100:.2f}%")
 
         # Danh gia tren Utility Test
         test_loss, test_accuracy = evaluate(
@@ -239,6 +252,9 @@ def main():
             "epochs": epochs,
             "batch_size": batch_size,
             "learning_rate": learning_rate,
+            "train_loss": train_loss,
+            "train_accuracy": train_accuracy,
+            "train_accuracy_percent": train_accuracy * 100,
             "test_loss": test_loss,
             "test_accuracy": test_accuracy,
             "test_accuracy_percent": test_accuracy * 100,

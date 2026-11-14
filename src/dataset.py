@@ -46,8 +46,9 @@ def load_config():
     Chuyển đường dẫn lưu split sang thư mục experiment.
     Nếu là exp_001, sao chép split baseline cũ sang vị trí mới, không xóa hay sửa file gốc."""
 
+
 def setup_experiment(config):
-    """Create experiment directories and configure experiment paths."""
+    """Create experiment directories and configure shared split paths."""
 
     global SPLIT_PATH, SPLIT_CONFIG_PATH
 
@@ -67,42 +68,61 @@ def setup_experiment(config):
 
     experiment_dir = PROJECT_ROOT / output_dir / experiment_id
 
-    experiment_results = experiment_dir / "results"
-    experiment_checkpoints = experiment_dir / "checkpoints"
+    # 1. Create shared split directory
+    split_dir = experiment_dir / "splits"
 
-    experiment_results.mkdir(parents=True, exist_ok=True)
-    experiment_checkpoints.mkdir(parents=True, exist_ok=True)
+    # 2. Create Non-DP directories
+    non_dp_dir = experiment_dir / "non_dp"
+    non_dp_checkpoints = non_dp_dir / "checkpoints"
+    non_dp_results = non_dp_dir / "results"
 
-    # Save a copy of the configuration used for this experiment.
+    # 3. Create DP directories
+    dp_dir = experiment_dir / "dp"
+    dp_checkpoints = dp_dir / "checkpoints"
+    dp_results = dp_dir / "results"
+
+    for directory in [
+        split_dir,
+        non_dp_checkpoints,
+        non_dp_results,
+        dp_checkpoints,
+        dp_results
+    ]:
+        directory.mkdir(parents=True, exist_ok=True)
+
+    # 4. Save a copy of the experiment configuration
     config_snapshot = experiment_dir / "config.yaml"
 
     if not config_snapshot.exists():
         shutil.copy2(CONFIG_PATH, config_snapshot)
 
-    # New experiment-specific split paths.
-    SPLIT_PATH = experiment_results / "splits.npz"
-    SPLIT_CONFIG_PATH = experiment_results / "split_config.json"
+    # 5. Configure shared split paths
+    SPLIT_PATH = split_dir / "splits.npz"
+    SPLIT_CONFIG_PATH = split_dir / "split_config.json"
 
-    # Preserve the original baseline split when migrating to exp_001.
-    legacy_split = PROJECT_ROOT / "results" / "splits.npz"
-    legacy_split_config = PROJECT_ROOT / "results" / "split_config.json"
+    # 6. Migration fallback:
+    # If shared splits do not exist, copy them from the old location.
+    legacy_results = experiment_dir / "results"
 
-    if (
-        experiment_id == "exp_001"
-        and not SPLIT_PATH.exists()
-        and legacy_split.exists()
-    ):
+    legacy_split = legacy_results / "splits.npz"
+    legacy_split_config = legacy_results / "split_config.json"
+
+    if not SPLIT_PATH.exists() and legacy_split.exists():
         shutil.copy2(legacy_split, SPLIT_PATH)
 
         if legacy_split_config.exists():
             shutil.copy2(legacy_split_config, SPLIT_CONFIG_PATH)
 
-        print("Existing baseline splits copied to exp_001.")
+        print("Existing splits copied from legacy results directory.")
 
     print("Current Experiment:", experiment_id)
     print("Experiment Directory:", experiment_dir)
+    print("Shared Split Directory:", split_dir)
+    print("Non-DP Directory:", non_dp_dir)
+    print("DP Directory:", dp_dir)
 
     return experiment_dir
+
 
 # ============================================================
 # 3. VALIDATE CONFIGURATION

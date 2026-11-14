@@ -167,15 +167,31 @@ def main():
         criterion,
         device
     )
+    # Danh gia lai tren tap Train
+    train_eval_loss, train_accuracy = evaluate(
+        model,
+        train_loader,
+        criterion,
+        device
+    )
 
     print("\n========== FINAL EVALUATION ==========")
+    print(f"Train Loss: {train_eval_loss:.4f}")
+    print(f"Train Accuracy: {train_accuracy:.4f}")
+    print(f"Train Accuracy (%): {train_accuracy * 100:.2f}%")
+
+
     print(f"Test Loss: {test_loss:.4f}")
     print(f"Test Accuracy: {test_accuracy:.4f}")
     print(f"Test Accuracy (%): {test_accuracy * 100:.2f}%")
 
-    # Tạo thư mục lưu kết quả của Experiment
-    checkpoint_dir = experiment_dir / "checkpoints"
-    results_dir = experiment_dir / "results"
+   
+    # Tạo thư mục lưu kết quả Non-DP
+    non_dp_dir = experiment_dir / "non_dp"
+
+    checkpoint_dir = non_dp_dir / "checkpoints"
+    results_dir = non_dp_dir / "results"
+
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -186,6 +202,7 @@ def main():
     torch.save(
         {
             "model_state_dict": model.state_dict(),
+            "train_accuracy": train_accuracy,
             "test_accuracy": test_accuracy,
             "config": config
         },
@@ -201,6 +218,11 @@ def main():
         "learning_rate": learning_rate,
         "train_samples": len(data["target_train"]),
         "test_samples": len(data["utility_test"]),
+
+        "train_loss": train_eval_loss,
+        "train_accuracy": train_accuracy,
+        "train_accuracy_percent": train_accuracy * 100,
+
         "test_loss": test_loss,
         "test_accuracy": test_accuracy,
         "test_accuracy_percent": test_accuracy * 100,

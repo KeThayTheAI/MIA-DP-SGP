@@ -40,6 +40,7 @@ def get_device():
 # ==========================================
 
 
+
 def load_attack_data(config, data_path):
 
     if not data_path.exists():
@@ -53,7 +54,7 @@ def load_attack_data(config, data_path):
     y = data["y"]
     shadow_ids = data["shadow_model_ids"]
 
-    # Validate original attack dataset
+    # Kiem tra kich thuoc du lieu
     if X.ndim != 2 or X.shape[1] != 10:
         raise ValueError(
             "Attack feature dimension must be 10."
@@ -64,15 +65,10 @@ def load_attack_data(config, data_path):
             "Attack dataset arrays have inconsistent lengths."
         )
 
-    # --------------------------------------------------
-    # 1. Read the number of Shadow Models from config
-    # --------------------------------------------------
-
+    # Kiem tra du so luong Shadow Models
     expected_models = config["dataset"]["num_shadow_models"]
-    train_shadow_models = config["attack"]["train_shadow_models"]
 
     unique_ids = np.sort(np.unique(shadow_ids))
-
     expected_ids = np.arange(1, expected_models + 1)
 
     if not np.array_equal(unique_ids, expected_ids):
@@ -80,59 +76,25 @@ def load_attack_data(config, data_path):
             "Shadow Model IDs in attack dataset do not match config."
         )
 
-    if train_shadow_models <= 0 or train_shadow_models >= expected_models:
-        raise ValueError(
-            "train_shadow_models must be greater than 0 "
-            "and smaller than num_shadow_models."
-        )
-
-    # --------------------------------------------------
-    # 2. Dynamically select training and validation models
-    # --------------------------------------------------
-
-    train_model_ids = expected_ids[:train_shadow_models]
-    val_model_ids = expected_ids[train_shadow_models:]
-
-    train_mask = np.isin(shadow_ids, train_model_ids)
-    val_mask = np.isin(shadow_ids, val_model_ids)
-
-    X_train = X[train_mask]
-    y_train = y[train_mask]
-
-    X_val = X[val_mask]
-    y_val = y[val_mask]
-
-    # --------------------------------------------------
-    # 3. Print dataset information
-    # --------------------------------------------------
+    # Su dung toan bo du lieu tu tat ca Shadow Models
+    X_train = X
+    y_train = y
 
     print("\n========== ATTACK DATASET ==========")
     print("Features shape:", X.shape)
     print("Labels shape:", y.shape)
     print("Shadow Model IDs:", unique_ids)
 
-    print("\n========== DATA SPLIT ==========")
-    print("Training Shadow Models:", train_model_ids)
-    print("Validation Shadow Models:", val_model_ids)
-
+    print("\n========== TRAINING DATA ==========")
     print("Training samples:", len(X_train))
-    print("Validation samples:", len(X_val))
-
     print("Training members:", int(np.sum(y_train == 1)))
     print("Training non-members:", int(np.sum(y_train == 0)))
 
-    print("Validation members:", int(np.sum(y_val == 1)))
-    print("Validation non-members:", int(np.sum(y_val == 0)))
+    if len(X_train) == 0:
+        raise ValueError("Attack dataset is empty.")
 
-    # --------------------------------------------------
-    # 4. Validate the resulting data
-    # --------------------------------------------------
+    return X_train, y_train
 
-    if len(X_train) == 0 or len(X_val) == 0:
-        raise ValueError(
-            "Training or validation dataset is empty."
-        )
-    return X_train, y_train, X_val, y_val
 
 
 # ==========================================
@@ -208,17 +170,19 @@ def train_attack_classifier():
         / experiment_config["id"]
     )
 
-    # Xac dinh cac duong dan
-    data_path = experiment_dir / "results" / "attack_dataset.npz"
+    # Xac dinh cac duong dan cua Attacker
+    attacker_dir = experiment_dir / "attacker"
+
+    data_path = attacker_dir / "results" / "attack_dataset.npz"
 
     checkpoint_path = (
-        experiment_dir
+        attacker_dir
         / "checkpoints"
         / "attack_classifier.pth"
     )
 
     metrics_path = (
-        experiment_dir
+        attacker_dir
         / "results"
         / "attack_classifier_metrics.json"
     )
@@ -228,17 +192,15 @@ def train_attack_classifier():
     learning_rate = config["training"]["learning_rate"]
 
     # Load dataset
-    X_train, y_train, X_val, y_val = load_attack_data(config, data_path)
+    
+    X_train, y_train = load_attack_data(config, data_path)
+
     # Convert NumPy arrays to PyTorch tensors
     X_train = torch.tensor(X_train, dtype=torch.float32)
     y_train = torch.tensor(y_train, dtype=torch.float32)
 
-    X_val = torch.tensor(X_val, dtype=torch.float32)
-    y_val = torch.tensor(y_val, dtype=torch.float32)
-
     # Create TensorDataset
     train_dataset = TensorDataset(X_train, y_train)
-    val_dataset = TensorDataset(X_val, y_val)
 
     # Create DataLoader
     train_loader = DataLoader(
@@ -247,11 +209,6 @@ def train_attack_classifier():
         shuffle=True
     )
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False
-    )
 
     # Select device
     device = get_device()
@@ -323,28 +280,19 @@ def train_attack_classifier():
         train_accuracy = total_correct / total_samples
 
         # Validation
-        val_loss, val_accuracy, _, _ = evaluate(
-            model,
-            val_loader,
-            criterion,
-            device
-        )
-
+        
         history.append({
             "epoch": epoch + 1,
             "train_loss": train_loss,
-            "train_accuracy": train_accuracy,
-            "val_loss": val_loss,
-            "val_accuracy": val_accuracy
+            "train_accuracy": train_accuracy
         })
 
         print(
             f"Epoch [{epoch + 1}/{epochs}] "
             f"Train Loss: {train_loss:.4f} "
-            f"Train Acc: {train_accuracy * 100:.2f}% "
-            f"Val Loss: {val_loss:.4f} "
-            f"Val Acc: {val_accuracy * 100:.2f}%"
+            f"Train Acc: {train_accuracy * 100:.2f}%"
         )
+
 
     # ======================================
     # 6. SAVE CHECKPOINT
@@ -372,18 +320,23 @@ def train_attack_classifier():
         exist_ok=True
     )
 
+    
     metrics = {
         "experiment_id": experiment_config["id"],
         "input_size": input_size,
         "epochs": epochs,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
+        "shadow_models_used": config["dataset"]["num_shadow_models"],
         "train_samples": len(X_train),
-        "validation_samples": len(X_val),
+        "train_members": int(torch.sum(y_train == 1).item()),
+        "train_nonmembers": int(torch.sum(y_train == 0).item()),
         "history": history,
+        "final_train_loss": history[-1]["train_loss"],
         "final_train_accuracy": history[-1]["train_accuracy"],
-        "final_validation_accuracy": history[-1]["val_accuracy"]
+        "final_train_accuracy_percent": history[-1]["train_accuracy"] * 100
     }
+
 
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(
@@ -399,13 +352,8 @@ def train_attack_classifier():
     print("Metrics:", metrics_path)
 
     print(
-        f"Final Train Accuracy: "
-        f"{history[-1]['train_accuracy'] * 100:.2f}%"
-    )
-
-    print(
-        f"Final Validation Accuracy: "
-        f"{history[-1]['val_accuracy'] * 100:.2f}%"
+    f"Final Train Accuracy: "
+    f"{history[-1]['train_accuracy'] * 100:.2f}%"
     )
 
 
